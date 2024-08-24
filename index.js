@@ -12,6 +12,7 @@ const validKeys = {
   '111122223333': { user: 'User2', expires: '2024-12-31' },
 };
 
+// Endpoint to validate the product key and generate a token
 app.post('/api/validate-key', (req, res) => {
   const { productKey } = req.body;
 
@@ -26,6 +27,24 @@ app.post('/api/validate-key', (req, res) => {
   } else {
     res.status(401).json({ error: 'Invalid product key' });
   }
+});
+
+// New endpoint to validate the token
+app.post('/api/validate-token', (req, res) => {
+  const { token } = req.body;
+
+  jwt.verify(token, 'your-secret-key', (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ valid: false, error: 'Token is invalid or has expired' });
+    }
+
+    const keyData = validKeys[decoded.productKey];
+    if (!keyData) {
+      return res.status(401).json({ valid: false, error: 'Token does not match a valid product key' });
+    }
+
+    res.json({ valid: true });
+  });
 });
 
 const PORT = process.env.PORT || 5000;
