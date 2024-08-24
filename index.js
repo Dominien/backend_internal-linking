@@ -8,17 +8,20 @@ app.use(bodyParser.json());
 app.use(cors());
 
 const validKeys = {
-  '1234-5678-9101': { user: 'User1', expires: '2024-12-31' },
-  '1111-2222-3333': { user: 'User2', expires: '2024-12-31' },
+  '123456789101': { user: 'User1', expires: '2024-12-31' }, // Normalize keys (remove dashes)
+  '111122223333': { user: 'User2', expires: '2024-12-31' },
 };
 
 app.post('/api/validate-key', (req, res) => {
   const { productKey } = req.body;
 
-  const keyData = validKeys[productKey];
+  // Normalize the product key by removing any dashes
+  const normalizedKey = productKey.replace(/-/g, '');
+
+  const keyData = validKeys[normalizedKey];
 
   if (keyData) {
-    const token = jwt.sign({ productKey, user: keyData.user }, 'your-secret-key', { expiresIn: '30d' });
+    const token = jwt.sign({ productKey: normalizedKey, user: keyData.user }, 'your-secret-key', { expiresIn: '30d' });
     res.json({ token });
   } else {
     res.status(401).json({ error: 'Invalid product key' });
