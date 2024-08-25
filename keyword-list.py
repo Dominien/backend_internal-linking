@@ -3,11 +3,10 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import openai
-import csv
-import time
+import os
 
-# Initialize the OpenAI client with your API key
-openai.api_key = 'sk-mF6DwaD6zmujy1peK69JlgPsExD_H7oLT40ZAjTBswT3BlbkFJSCd866IclcXIzayMax2CgpkjgUDuzzDE6Nos8KJe4A'  # Replace with your actual OpenAI API key
+# Initialize the OpenAI client with your API key from environment variables
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 app = Flask(__name__)
 
