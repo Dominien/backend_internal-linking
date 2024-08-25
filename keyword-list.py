@@ -7,7 +7,7 @@ import csv
 import time
 
 # Initialize the OpenAI client with your API key
-openai.api_key = 'your_openai_api_key'
+openai.api_key = 'sk-mF6DwaD6zmujy1peK69JlgPsExD_H7oLT40ZAjTBswT3BlbkFJSCd866IclcXIzayMax2CgpkjgUDuzzDE6Nos8KJe4A'  # Replace with your actual OpenAI API key
 
 app = Flask(__name__)
 
@@ -113,4 +113,4 @@ def generate_keywords_api():
         return jsonify({"error": "No URLs found to process"}), 404
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
