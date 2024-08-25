@@ -2,12 +2,12 @@ from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-from openai import OpenAI
+import openai
 import csv
 import time
 
 # Initialize the OpenAI client with your API key
-client = OpenAI(api_key='your_openai_api_key')
+openai.api_key = 'your_openai_api_key'
 
 app = Flask(__name__)
 
@@ -64,7 +64,7 @@ def generate_keywords(urls):
         prompt += f"{url}\n"
 
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
@@ -74,7 +74,7 @@ def generate_keywords(urls):
             temperature=0.7
         )
         
-        content = response.choices[0]['message']['content'].strip()
+        content = response['choices'][0]['message']['content'].strip()
         # Split content into lines and parse
         lines = content.split('\n')
         results = []
