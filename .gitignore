@@ -1,0 +1,3 @@
+node-backend/node_modules/
+python-backend/__pycache__/
+python-backend/.venv/
