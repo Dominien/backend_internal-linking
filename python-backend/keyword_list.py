@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 from openai import OpenAI
 import time
 import os
+import sys
 
 # Initialize the OpenAI client with your API key
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
@@ -60,7 +61,7 @@ def get_all_urls(domain, max_depth=2):
     app.logger.info(f"Total URLs found: {len(all_urls)}")
     return list(all_urls)
 
-def generate_keywords(urls, model="gpt-4o"):
+def generate_keywords(urls, model="gpt-3.5-turbo"):
     """Generates keywords for a list of URLs using OpenAI's API."""
     prompt = (
         "For each URL below, generate exactly 2 double-word keywords and 2 single-word keywords in German.\n\n"
@@ -130,7 +131,7 @@ def generate_keywords_api():
         results = []
 
         if all_urls:
-            batch_size = 7
+            batch_size = 5
             for i in range(0, len(all_urls), batch_size):
                 batch_urls = all_urls[i:i + batch_size]
                 batch_results = generate_keywords(batch_urls)
@@ -145,6 +146,9 @@ def generate_keywords_api():
         else:
             app.logger.warning(f"No URLs found for domain: {domain}")
             return jsonify({"error": "No URLs found to process"}), 404
+    except SystemExit:
+        app.logger.error("SystemExit encountered. Exiting gracefully.")
+        sys.exit(1)
     except Exception as e:
         app.logger.error(f"Error processing request: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
