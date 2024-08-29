@@ -114,4 +114,6 @@ def generate_keywords_api():
         return jsonify({"error": "No URLs found to process"}), 404
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True)
+    # Ensure the app binds to the port provided by the environment
+    port = int(os.environ.get("PORT", 10000))  # Default to port 10000 if PORT is not set
+    app.run(host="0.0.0.0", port=port, debug=True)
