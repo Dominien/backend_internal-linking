@@ -115,7 +115,7 @@ def generate_keywords_api():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "healthy"}), 200
+    return "<h1>Healthy</h1>", 200
 
 if __name__ == "__main__":
     # Ensure the app binds to the port provided by the environment
