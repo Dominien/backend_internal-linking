@@ -3,15 +3,14 @@ from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-import openai
+from openai import OpenAI
+import time
 import os
 
-# Initialize the OpenAI client with your API key from environment variables
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# Initialize the OpenAI client with your API key
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 app = Flask(__name__)
-
-# Enable CORS for all routes
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 def fetch(url):
@@ -30,7 +29,9 @@ def get_all_urls(domain, max_depth=2):
     urls_to_visit = set([domain])
     all_urls = set()
 
+    app.logger.info(f"Starting URL crawl on: {domain}")
     for depth in range(1, max_depth + 1):
+        app.logger.info(f"Depth {depth} crawling...")
         new_urls = set()
         
         for url in urls_to_visit:
@@ -56,46 +57,56 @@ def get_all_urls(domain, max_depth=2):
         if not urls_to_visit:
             break
 
-    app.logger.info(f"URLs found: {all_urls}")
+    app.logger.info(f"Total URLs found: {len(all_urls)}")
     return list(all_urls)
 
-def generate_keywords(urls):
+def generate_keywords(urls, model="gpt-4o-mini"):
     """Generates keywords for a list of URLs using OpenAI's API."""
     prompt = (
         "For each URL below, generate exactly 2 double-word keywords and 2 single-word keywords in German.\n\n"
+        "Please follow only the format and don't generate anything else.\n"
         "Provide the keywords in the following format:\n\n"
         "keyword, url\n\n"
-        "for these URLs:\n"
+        "for these urls:\n"
     )
     for url in urls:
         prompt += f"{url}\n"
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=150,
-            temperature=0.7
-        )
-        
-        content = response['choices'][0]['message']['content'].strip()
-        # Split content into lines and parse
-        lines = content.split('\n')
-        results = []
+    retry_attempts = 5
+    backoff = 20  # Start with a 20-second backoff
 
-        for line in lines:
-            if ',' in line:
-                keyword, url = map(str.strip, line.split(',', 1))
-                results.append([keyword, url])
+    for attempt in range(retry_attempts):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            content = response.choices[0].message.content.strip()
+            # Split content into lines and parse
+            lines = content.split('\n')
+            results = []
 
-        app.logger.info(f"Generated keywords: {results}")
-        return results
-    except Exception as e:
-        app.logger.error(f"Failed to generate keywords for URLs: {e}")
-        return []
+            for line in lines:
+                if ',' in line:
+                    keyword, url = map(str.strip, line.split(',', 1))
+                    results.append([keyword, url])
+
+            app.logger.info(f"Generated keywords: {results}")
+            return results
+        except Exception as e:
+            if 'rate_limit' in str(e).lower():
+                app.logger.warning(f"Rate limit exceeded, retrying in {backoff} seconds... (Attempt {attempt + 1}/{retry_attempts})")
+                time.sleep(backoff)
+                backoff *= 2  # Exponential backoff
+            else:
+                app.logger.error(f"Failed to generate keywords for URLs: {e}")
+                return []
 
 @app.route('/generate-keywords', methods=['POST'])
 def generate_keywords_api():
@@ -115,8 +126,7 @@ def generate_keywords_api():
         results = []
 
         if all_urls:
-            # Process URLs in batches of 10
-            batch_size = 10
+            batch_size = 5
             for i in range(0, len(all_urls), batch_size):
                 batch_urls = all_urls[i:i + batch_size]
                 batch_results = generate_keywords(batch_urls)
@@ -141,6 +151,5 @@ def health_check():
     return "<h1>Healthy</h1>", 200
 
 if __name__ == "__main__":
-    # Ensure the app binds to the port provided by the environment
     port = int(os.environ.get("PORT", 10000))  # Default to port 10000 if PORT is not set
     app.run(host="0.0.0.0", port=port, debug=True)
