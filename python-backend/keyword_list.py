@@ -99,6 +99,7 @@ def generate_keywords(urls, model="gpt-4o-mini"):
 
             app.logger.info(f"Generated keywords: {results}")
             return results
+
         except Exception as e:
             if 'rate_limit' in str(e).lower():
                 app.logger.warning(f"Rate limit exceeded, retrying in {backoff} seconds... (Attempt {attempt + 1}/{retry_attempts})")
@@ -107,6 +108,9 @@ def generate_keywords(urls, model="gpt-4o-mini"):
             else:
                 app.logger.error(f"Failed to generate keywords for URLs: {e}")
                 return []
+
+        app.logger.error(f"Exceeded maximum retries for generating keywords after {attempt} attempts.")
+    return []
 
 @app.route('/generate-keywords', methods=['POST'])
 def generate_keywords_api():
