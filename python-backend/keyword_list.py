@@ -60,7 +60,7 @@ def get_all_urls(domain, max_depth=2):
     app.logger.info(f"Total URLs found: {len(all_urls)}")
     return list(all_urls)
 
-def generate_keywords(urls, model="gpt-4o-mini"):
+def generate_keywords(urls, model="gpt-4o"):
     """Generates keywords for a list of URLs using OpenAI's API."""
     prompt = (
         "For each URL below, generate exactly 2 double-word keywords and 2 single-word keywords in German.\n\n"
@@ -130,7 +130,7 @@ def generate_keywords_api():
         results = []
 
         if all_urls:
-            batch_size = 5
+            batch_size = 7
             for i in range(0, len(all_urls), batch_size):
                 batch_urls = all_urls[i:i + batch_size]
                 batch_results = generate_keywords(batch_urls)
