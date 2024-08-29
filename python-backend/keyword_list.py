@@ -56,6 +56,7 @@ def get_all_urls(domain, max_depth=2):
         if not urls_to_visit:
             break
 
+    app.logger.info(f"URLs found: {all_urls}")
     return list(all_urls)
 
 def generate_keywords(urls):
@@ -90,6 +91,7 @@ def generate_keywords(urls):
                 keyword, url = map(str.strip, line.split(',', 1))
                 results.append([keyword, url])
 
+        app.logger.info(f"Generated keywords: {results}")
         return results
     except Exception as e:
         app.logger.error(f"Failed to generate keywords for URLs: {e}")
@@ -98,30 +100,40 @@ def generate_keywords(urls):
 @app.route('/generate-keywords', methods=['POST'])
 def generate_keywords_api():
     """API endpoint to generate keywords for a given domain."""
-    data = request.json
-    domain = data.get('domain')
-    max_depth = data.get('max_depth', 2)
+    try:
+        data = request.json
+        domain = data.get('domain')
+        max_depth = data.get('max_depth', 2)
 
-    if not domain:
-        app.logger.error("Domain is missing from the request.")
-        return jsonify({"error": "Domain is required"}), 400
+        if not domain:
+            app.logger.error("Domain is missing from the request.")
+            return jsonify({"error": "Domain is required"}), 400
 
-    app.logger.info(f"Processing domain: {domain} with max depth: {max_depth}")
+        app.logger.info(f"Processing domain: {domain} with max depth: {max_depth}")
 
-    all_urls = get_all_urls(domain, max_depth)
-    results = []
+        all_urls = get_all_urls(domain, max_depth)
+        results = []
 
-    if all_urls:
-        # Process URLs in batches of 10
-        batch_size = 10
-        for i in range(0, len(all_urls), batch_size):
-            batch_urls = all_urls[i:i + batch_size]
-            results.extend(generate_keywords(batch_urls))
+        if all_urls:
+            # Process URLs in batches of 10
+            batch_size = 10
+            for i in range(0, len(all_urls), batch_size):
+                batch_urls = all_urls[i:i + batch_size]
+                batch_results = generate_keywords(batch_urls)
+                if batch_results:
+                    results.extend(batch_results)
 
-        return jsonify(results)
-    else:
-        app.logger.warning(f"No URLs found for domain: {domain}")
-        return jsonify({"error": "No URLs found to process"}), 404
+            if not results:
+                app.logger.warning("No keywords generated")
+                return jsonify({"message": "No keywords generated"}), 200
+
+            return jsonify(results)
+        else:
+            app.logger.warning(f"No URLs found for domain: {domain}")
+            return jsonify({"error": "No URLs found to process"}), 404
+    except Exception as e:
+        app.logger.error(f"Error processing request: {e}")
+        return jsonify({"error": "An internal error occurred"}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
