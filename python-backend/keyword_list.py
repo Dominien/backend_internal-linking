@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import CORS from flask_cors
+from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -10,18 +10,22 @@ import os
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 def fetch(url):
+    """Fetches the HTML content of a given URL."""
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         return response.text
     except requests.RequestException as e:
-        print(f"Failed to retrieve {url}: {e}")
+        app.logger.error(f"Failed to retrieve {url}: {e}")
         return None
 
 def get_all_urls(domain, max_depth=2):
+    """Crawls the given domain up to a certain depth and returns all found URLs."""
     visited_urls = set()
     urls_to_visit = set([domain])
     all_urls = set()
@@ -55,11 +59,12 @@ def get_all_urls(domain, max_depth=2):
     return list(all_urls)
 
 def generate_keywords(urls):
+    """Generates keywords for a list of URLs using OpenAI's API."""
     prompt = (
-        "For each URL below given, generate exactly 2 double-word keywords and 2 single-word keywords in German.\n\n"
+        "For each URL below, generate exactly 2 double-word keywords and 2 single-word keywords in German.\n\n"
         "Provide the keywords in the following format:\n\n"
         "keyword, url\n\n"
-        "for these urls:\n"
+        "for these URLs:\n"
     )
     for url in urls:
         prompt += f"{url}\n"
@@ -87,17 +92,21 @@ def generate_keywords(urls):
 
         return results
     except Exception as e:
-        print(f"Failed to generate keywords for URLs: {e}")
+        app.logger.error(f"Failed to generate keywords for URLs: {e}")
         return []
 
 @app.route('/generate-keywords', methods=['POST'])
 def generate_keywords_api():
+    """API endpoint to generate keywords for a given domain."""
     data = request.json
     domain = data.get('domain')
     max_depth = data.get('max_depth', 2)
 
     if not domain:
+        app.logger.error("Domain is missing from the request.")
         return jsonify({"error": "Domain is required"}), 400
+
+    app.logger.info(f"Processing domain: {domain} with max depth: {max_depth}")
 
     all_urls = get_all_urls(domain, max_depth)
     results = []
@@ -111,10 +120,12 @@ def generate_keywords_api():
 
         return jsonify(results)
     else:
+        app.logger.warning(f"No URLs found for domain: {domain}")
         return jsonify({"error": "No URLs found to process"}), 404
 
 @app.route('/health', methods=['GET'])
 def health_check():
+    """Health check endpoint to verify that the service is running."""
     return "<h1>Healthy</h1>", 200
 
 if __name__ == "__main__":
