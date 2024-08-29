@@ -113,6 +113,10 @@ def generate_keywords_api():
     else:
         return jsonify({"error": "No URLs found to process"}), 404
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 if __name__ == "__main__":
     # Ensure the app binds to the port provided by the environment
     port = int(os.environ.get("PORT", 10000))  # Default to port 10000 if PORT is not set
