@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import pandas as pd
 import re
 
 app = Flask(__name__)
+CORS(app)  # This enables CORS for all routes and origins by default
 
 # Assuming the CSV file is preloaded or stored in memory
 CSV_FILE = 'keyword_url_list.csv'
