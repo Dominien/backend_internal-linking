@@ -10,8 +10,8 @@ app.use(cors());
 const secretKey = 'your-secret-key';  // Store secret key in a variable
 
 const validKeys = {
-  '123456789101': { user: 'User1', expires: '2024-12-31' },
-  '111122223333': { user: 'User2', expires: '2024-12-31' },
+  '123456789101': { user: 'Marketer UX', expires: '2024-12-31' },
+  '111122223333': { user: 'Eric Gerl', expires: '2024-12-31' },
 };
 
 // Normalize the product key by removing any dashes
