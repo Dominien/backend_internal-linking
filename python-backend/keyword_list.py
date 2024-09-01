@@ -111,7 +111,8 @@ def improve_linking_with_openai(input_text, found_keywords):
         "\nPlease follow these rules when analyzing the text:\n"
         "1. Do not wrap keywords in headings (e.g., <h1>, <h2>, etc.).\n"
         "2. Each keyword should only be wrapped once; avoid wrapping a keyword more than once.\n"
-        "\nPlease analyze the context of the text and suggest better placements for the links to improve readability and relevance. "
+        "3. Only generate the revised text without any additional commentary or content.\n"
+        "Please analyze the context of the text and suggest better placements for the links to improve readability and relevance."
         "Do not introduce new links or URLs, only reposition or improve the context around the existing linked keywords."
     )
 
