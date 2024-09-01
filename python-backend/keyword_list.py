@@ -32,7 +32,7 @@ class OpenAIClient:
                 {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=850,
+            max_tokens=1250,
             temperature=0.7
         )
         
