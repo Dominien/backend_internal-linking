@@ -106,7 +106,11 @@ def improve_linking_with_openai(input_text, found_keywords):
     for item in found_keywords:
         prompt += f"- {item['keyword']}: {item['url']}\n"
     
+    # Include the new rules in the prompt
     prompt += (
+        "\nPlease follow these rules when analyzing the text:\n"
+        "1. Do not wrap keywords in headings (e.g., <h1>, <h2>, etc.).\n"
+        "2. Each keyword should only be wrapped once; avoid wrapping a keyword more than once.\n"
         "\nPlease analyze the context of the text and suggest better placements for the links to improve readability and relevance. "
         "Do not introduce new links or URLs, only reposition or improve the context around the existing linked keywords."
     )
@@ -124,6 +128,7 @@ def improve_linking_with_openai(input_text, found_keywords):
     # Correctly access the message content using dot notation
     improved_text = response.choices[0].message.content.strip()
     return improved_text
+
 
 @app.route('/process-text', methods=['POST'])
 def process_text():
