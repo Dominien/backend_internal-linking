@@ -3,15 +3,17 @@ from flask_cors import CORS
 import pandas as pd
 import re
 import openai
+import os
 
 app = Flask(__name__)
 CORS(app)  # This enables CORS for all routes and origins by default
 
-# Initialize OpenAI client with the API key (replace 'your-openai-api-key' with your actual API key)
+# Initialize OpenAI client with the API key from environment variables
+openai.api_key = os.getenv('OPENAI_API_KEY')
+
 class OpenAIClient:
-    def __init__(self, api_key):
+    def __init__(self):
         self.client = openai
-        self.client.api_key = api_key
     
     def generate_keywords(self, urls, model="gpt-4o-mini"):
         prompt = (
@@ -29,15 +31,15 @@ class OpenAIClient:
                 {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=150,
+            max_tokens=850,
             temperature=0.7
         )
         
         keywords = response.choices[0].message['content'].strip().split("\n")
         return [keyword.strip() for keyword in keywords]
 
-# Instantiate the OpenAI client with your API key
-openai_client = OpenAIClient(api_key='your-openai-api-key')
+# Instantiate the OpenAI client (now without needing to pass the API key explicitly)
+openai_client = OpenAIClient()
 
 # Assuming the CSV file is preloaded or stored in memory
 CSV_FILE = 'keyword_url_list.csv'
@@ -82,6 +84,7 @@ def generate_hyperlinked_text(input_text, keyword_url_pairs, excluded_url):
     return processed_text, found_keywords
 
 def improve_linking_with_openai(input_text, found_keywords):
+    # Construct the prompt to improve linking with the current context
     prompt = (
         "You are an AI text enhancer. Here is a text with some hyperlinked keywords:\n\n"
         f"{input_text}\n\n"
@@ -120,10 +123,10 @@ def process_text():
     # Step 1: Generate the initial hyperlinked text and get the found keywords
     hyperlinked_text, found_keywords = generate_hyperlinked_text(input_text, keyword_url_pairs, excluded_url)
 
-    # Step 2: Use OpenAI to improve the linking based on context
+    # Step 2: Use OpenAI to analyze and suggest improvements for the current linking structure
     improved_text = improve_linking_with_openai(hyperlinked_text, found_keywords)
 
-    return jsonify({'hyperlinked_text': improved_text})
+    return jsonify({'hyperlinked_text': improved_text, 'found_keywords': found_keywords})
 
 if __name__ == '__main__':
     app.run(debug=True)
