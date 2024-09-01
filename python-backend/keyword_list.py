@@ -61,6 +61,7 @@ def generate_hyperlinked_text(input_text, keyword_url_pairs, excluded_url):
     url_link_count = {}
     found_keywords = []
 
+    # Sort keyword pairs by length of the keyword to handle longer matches first
     keyword_url_pairs.sort(key=lambda x: len(x['Keyword']), reverse=True)
 
     def replace_keyword(match):
@@ -70,17 +71,28 @@ def generate_hyperlinked_text(input_text, keyword_url_pairs, excluded_url):
             if url == excluded_url:
                 continue
             if (keyword.lower() == pair['Keyword'].lower() and 
-                pair['Keyword'].lower() not in linked_keywords and 
+                keyword.lower() not in linked_keywords and 
                 url_link_count.get(url, 0) < 2):
                 
-                linked_keywords.add(pair['Keyword'].lower())
+                linked_keywords.add(keyword.lower())
                 url_link_count[url] = url_link_count.get(url, 0) + 1
                 found_keywords.append({'keyword': keyword, 'url': url})
                 return f'<a href="{url}">{keyword}</a>'
         return keyword
 
-    pattern = r'\b(?:' + '|'.join(re.escape(pair['Keyword']) for pair in keyword_url_pairs) + r')\b'
-    processed_text = re.sub(pattern, replace_keyword, input_text, flags=re.IGNORECASE)
+    # Regex pattern to match headings (e.g., <h1>, <h2>, ... <h6>)
+    heading_pattern = re.compile(r'(<h[1-6][^>]*>)(.*?)(</h[1-6]>)', re.IGNORECASE)
+
+    def process_non_heading_text(text):
+        pattern = r'\b(?:' + '|'.join(re.escape(pair['Keyword']) for pair in keyword_url_pairs) + r')\b'
+        return re.sub(pattern, replace_keyword, text, flags=re.IGNORECASE)
+
+    def process_heading(match):
+        return match.group(1) + match.group(2) + match.group(3)
+
+    # Split input text by headings and process them separately
+    processed_text = re.sub(heading_pattern, lambda m: process_heading(m), input_text)
+    processed_text = process_non_heading_text(processed_text)
 
     return processed_text, found_keywords
 
