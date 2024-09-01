@@ -109,8 +109,8 @@ def improve_linking_with_openai(input_text, found_keywords):
         temperature=0.7,
     )
 
-    # Access the content of the first message in the response correctly
-    improved_text = response.choices[0].message['content'].strip()
+    # Correctly access the message content using dot notation
+    improved_text = response.choices[0].message.content.strip()
     return improved_text
 
 @app.route('/process-text', methods=['POST'])
