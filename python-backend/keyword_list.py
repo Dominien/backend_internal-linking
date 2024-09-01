@@ -36,7 +36,7 @@ class OpenAIClient:
             temperature=0.7
         )
         
-        keywords = response.choices[0].message['content'].strip().split("\n")
+        keywords = response.choices[0].message.content.strip().split("\n")
         return [keyword.strip() for keyword in keywords]
 
 # Instantiate the OpenAI client (now using the `client` object)
@@ -109,6 +109,7 @@ def improve_linking_with_openai(input_text, found_keywords):
         temperature=0.7,
     )
 
+    # Access the content of the first message in the response correctly
     improved_text = response.choices[0].message['content'].strip()
     return improved_text
 
