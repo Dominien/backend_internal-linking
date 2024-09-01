@@ -1,132 +1,142 @@
+import os
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+from openai import OpenAI
+import csv
+from tqdm import tqdm
+import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pandas as pd
-import re
-import openai
-import os
 
+# Initialize the Flask app
 app = Flask(__name__)
-CORS(app)  # This enables CORS for all routes and origins by default
+CORS(app)
 
-# Initialize OpenAI client with the API key from environment variables
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# Initialize the OpenAI client with your API key from environment variables
+api_key = os.getenv('OPENAI_API_KEY')
+client = OpenAI(api_key=api_key)
 
-class OpenAIClient:
-    def __init__(self):
-        self.client = openai
-    
-    def generate_keywords(self, urls, model="gpt-4"):
-        prompt = (
-            "Given the following URLs, please generate a list of relevant keywords that would be "
-            "appropriate for internal linking within a webpage:\n\n"
-        )
-        for url in urls:
-            prompt += f"- {url}\n"
-        
-        prompt += "\nProvide the keywords in a list format."
-        
-        response = self.client.ChatCompletion.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=850,
-            temperature=0.7
-        )
-        
-        keywords = response.choices[0].message['content'].strip().split("\n")
-        return [keyword.strip() for keyword in keywords]
-
-# Instantiate the OpenAI client (now without needing to pass the API key explicitly)
-openai_client = OpenAIClient()
-
-# Assuming the CSV file is preloaded or stored in memory
-CSV_FILE = 'keyword_url_list.csv'
-
-def load_keyword_url_pairs():
+def fetch(url):
     try:
-        df = pd.read_csv(CSV_FILE)
-        if 'Keyword' not in df.columns or 'URL' not in df.columns:
-            raise ValueError("CSV must contain 'Keyword' and 'URL' columns.")
-        return df.to_dict('records')
-    except Exception as e:
-        return []
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        print(f"Failed to retrieve {url}: {e}")
+        return None
 
-keyword_url_pairs = load_keyword_url_pairs()
+def get_all_urls(domain, max_depth=2):
+    visited_urls = set()
+    urls_to_visit = set([domain])
+    all_urls = set()
 
-def generate_hyperlinked_text(input_text, keyword_url_pairs, excluded_url):
-    linked_keywords = set()
-    url_link_count = {}
-    found_keywords = []
-
-    keyword_url_pairs.sort(key=lambda x: len(x['Keyword']), reverse=True)
-
-    def replace_keyword(match):
-        keyword = match.group(0)
-        for pair in keyword_url_pairs:
-            url = pair['URL']
-            if url == excluded_url:
+    print(f"Starting URL crawl on: {domain}")
+    for depth in range(1, max_depth + 1):
+        print(f"\nDepth {depth} crawling...")
+        new_urls = set()
+        
+        for url in urls_to_visit:
+            if url in visited_urls:
                 continue
-            if (keyword.lower() == pair['Keyword'].lower() and 
-                pair['Keyword'].lower() not in linked_keywords and 
-                url_link_count.get(url, 0) < 2):
-                
-                linked_keywords.add(pair['Keyword'].lower())
-                url_link_count[url] = url_link_count.get(url, 0) + 1
-                found_keywords.append({'keyword': keyword, 'url': url})
-                return f'<a href="{url}">{keyword}</a>'
-        return keyword
+            
+            response = fetch(url)
+            if response is None:
+                continue
+            
+            visited_urls.add(url)
+            soup = BeautifulSoup(response, 'html.parser')
 
-    pattern = r'\b(?:' + '|'.join(re.escape(pair['Keyword']) for pair in keyword_url_pairs) + r')\b'
-    processed_text = re.sub(pattern, replace_keyword, input_text, flags=re.IGNORECASE)
+            for link in soup.find_all('a', href=True):
+                full_url = urljoin(url, link['href'])
+                parsed_url = urlparse(full_url)
+                if parsed_url.netloc == urlparse(domain).netloc:
+                    if full_url not in visited_urls and full_url not in all_urls:
+                        new_urls.add(full_url)
+                        all_urls.add(full_url)
 
-    return processed_text, found_keywords
+        urls_to_visit = new_urls
+        if not urls_to_visit:
+            break
 
-def improve_linking_with_openai(input_text, found_keywords):
-    # Construct the prompt to improve linking with the current context
+    print(f"\nTotal URLs found: {len(all_urls)}")
+    return list(all_urls)
+
+def generate_keywords(urls, model="gpt-4o-mini"):
     prompt = (
-        "You are an AI text enhancer. Here is a text with some hyperlinked keywords:\n\n"
-        f"{input_text}\n\n"
-        "Below are the keywords and their corresponding URLs:\n"
+        "For each URL below given, generate exactly 2 double-word keywords and 2 single-word keywords in German.\n\n"
+        "Please follow only the format and don't generate anything else.\n"
+        "Provide the keywords in the following format:\n\n"
+        "keyword, url\n\n"
+        "for these urls:\n"
     )
-    for item in found_keywords:
-        prompt += f"- {item['keyword']}: {item['url']}\n"
-    
-    prompt += (
-        "\nPlease analyze the context of the text and suggest better placements for the links to improve readability and relevance. "
-        "Do not introduce new links or URLs, only reposition or improve the context around the existing linked keywords."
-    )
+    for url in urls:
+        prompt += f"{url}\n"
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # Using the specified model
-        messages=[
-            {"role": "system", "content": "You are a helpful SEO Expert assistant that improves hyperlink placement within text."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=1024,
-        temperature=0.7,
-    )
+    retry_attempts = 5
+    backoff = 20  # Start with a 20-second backoff
 
-    improved_text = response.choices[0].message['content'].strip()
-    return improved_text
+    for attempt in range(retry_attempts):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful SEO Expert assistant that generates concise and relevant keywords based on URLs provided."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            content = response.choices[0].message.content.strip()
+            # Split content into lines and parse
+            lines = content.split('\n')
+            results = []
+
+            for line in lines:
+                if ',' in line:
+                    keyword, url = map(str.strip, line.split(',', 1))
+                    results.append([keyword, url])
+
+            return results
+        except Exception as e:
+            if 'rate_limit' in str(e).lower():
+                print(f"Rate limit exceeded, retrying in {backoff} seconds... (Attempt {attempt + 1}/{retry_attempts})")
+                time.sleep(backoff)
+                backoff *= 2  # Exponential backoff
+            else:
+                print(f"Failed to generate keywords for URLs: {e}")
+                return []
+
+def process_batch(batch_urls):
+    # Process a batch of URLs
+    return generate_keywords(batch_urls)
 
 @app.route('/process-text', methods=['POST'])
 def process_text():
     data = request.json
-    input_text = data.get('input_text', '')
-    excluded_url = data.get('exclude_url', '')
+    domain = data.get('domain', '')
+    max_depth = data.get('max_depth', 2)
 
-    if not input_text:
-        return jsonify({'error': 'No input text provided'}), 400
+    # Retrieve URLs
+    all_urls = get_all_urls(domain, max_depth=max_depth)
 
-    # Step 1: Generate the initial hyperlinked text and get the found keywords
-    hyperlinked_text, found_keywords = generate_hyperlinked_text(input_text, keyword_url_pairs, excluded_url)
+    # Generate keywords and return as JSON
+    if all_urls:
+        print("\nStarting keyword generation...")
+        results = []
+        batch_size = 5
+        for i in tqdm(range(0, len(all_urls), batch_size), desc="Generating keywords", unit="batch"):
+            batch_urls = all_urls[i:i + batch_size]
+            batch_results = process_batch(batch_urls)
+            if batch_results:
+                results.extend(batch_results)
+            else:
+                print(f"No results returned for batch {i // batch_size + 1}")
 
-    # Step 2: Use OpenAI to analyze and suggest improvements for the current linking structure
-    improved_text = improve_linking_with_openai(hyperlinked_text, found_keywords)
+        return jsonify({'keywords': results})
+    else:
+        return jsonify({'error': 'No URLs found to process.'})
 
-    return jsonify({'hyperlinked_text': improved_text, 'found_keywords': found_keywords})
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
