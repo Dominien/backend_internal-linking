@@ -15,7 +15,7 @@ class OpenAIClient:
     def __init__(self):
         self.client = openai
     
-    def generate_keywords(self, urls, model="gpt-4o-mini"):
+    def generate_keywords(self, urls, model="gpt-4"):
         prompt = (
             "Given the following URLs, please generate a list of relevant keywords that would be "
             "appropriate for internal linking within a webpage:\n\n"
@@ -98,8 +98,8 @@ def improve_linking_with_openai(input_text, found_keywords):
         "Do not introduce new links or URLs, only reposition or improve the context around the existing linked keywords."
     )
 
-    response = openai_client.client.ChatCompletion.create(
-        model="gpt-4o-mini",  # Using the specified model
+    response = openai.ChatCompletion.create(
+        model="gpt-4",  # Using the specified model
         messages=[
             {"role": "system", "content": "You are a helpful SEO Expert assistant that improves hyperlink placement within text."},
             {"role": "user", "content": prompt}
